@@ -1,0 +1,16 @@
+repository_type: pipeline
+
+nf_core_version: 3.5.1
+
+lint: {}
+
+template:
+  org: nf-core
+  name: genomeanno
+  description: Small pipeline for quick annotation and AMR check of assembled bacterial
+    genomes
+  author: Laurenz Holcik
+  version: 1.0.0dev
+  force: true
+  outdir: .
+  is_nfcore: true
