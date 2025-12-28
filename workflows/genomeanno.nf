@@ -22,15 +22,14 @@ workflow GENOMEANNO {
     ch_samplesheet // channel: samplesheet read in from --input
     main:
 
+
+    // 
+    // MODULE
+    // 
+    
+
+
     ch_versions = channel.empty()
-    ch_multiqc_files = channel.empty()
-    //
-    // MODULE: Run FastQC
-    //
-    FASTQC (
-        ch_samplesheet
-    )
-    ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]})
     ch_versions = ch_versions.mix(FASTQC.out.versions.first())
 
     //
