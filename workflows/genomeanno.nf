@@ -9,6 +9,9 @@ include { paramsSummaryMap       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_genomeanno_pipeline'
+include { GTDBTK_CLASSIFYWF } from '../modules/nf-core/gtdbtk/classifywf/main'
+include { ABRICATE_RUN } from '../modules/nf-core/abricate/run/main'
+include { ABRICATE_SUMMARY } from '../modules/nf-core/abricate/summary/main'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
