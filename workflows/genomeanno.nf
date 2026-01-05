@@ -3,7 +3,6 @@
     IMPORT MODULES / SUBWORKFLOWS / FUNCTIONS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
-include { FASTQC                 } from '../modules/nf-core/fastqc/main'
 include { MULTIQC                } from '../modules/nf-core/multiqc/main'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -25,20 +24,50 @@ workflow GENOMEANNO {
     ch_samplesheet // channel: samplesheet read in from --input
     main:
 
+    ch_versions      = channel.empty()
+    ch_multiqc_files = channel.empty()
 
-    // 
-    // MODULE
-    // 
+    //
+    // MODULE: Abricate (AMR Screening)
+    //
+    def abricate_db = params.abricate_db ? file(params.abricate_db, checkIfExists: true) : []
+
+    ABRICATE_RUN (
+        ch_samplesheet,
+        abricate_db
+    )
+    ch_versions      = ch_versions.mix(ABRICATE_RUN.out.versions.first())
+    ch_multiqc_files = ch_multiqc_files.mix(ABRICATE_RUN.out.report.collect{v -> v[1]})
+
+    //
+    // MODULE: Abricate Summary
+    //
+    // Collect all reports and create a single summary
+    ABRICATE_SUMMARY (
+        ABRICATE_RUN.out.report.collect{ v -> v[1] }.map{ reports -> [ [id:'summary'], reports ] }
+    )
+    ch_versions      = ch_versions.mix(ABRICATE_SUMMARY.out.versions)
+
+    //
+    // MODULE: GTDB-Tk (Taxonomic Classification)
+    //
+    if (params.gtdb_db) {
+        // Create a value channel for the database so it can be reused for every sample
+        ch_gtdb_db = channel.fromPath(params.gtdb_db).map{ db -> [ [id:'gtdb'], db ] }.first()
+
+        GTDBTK_CLASSIFYWF (
+            ch_samplesheet, // No need to map, strictly matches [meta, bins]
+            ch_gtdb_db,
+            false
+        )       
+        ch_versions      = ch_versions.mix(GTDBTK_CLASSIFYWF.out.versions.first())
+        ch_multiqc_files = ch_multiqc_files.mix(GTDBTK_CLASSIFYWF.out.summary.collect{v -> v[1]})
+    }
     
-
-
-    ch_versions = channel.empty()
-    ch_versions = ch_versions.mix(FASTQC.out.versions.first())
-
     //
     // Collate and save software versions
     //
-    def topic_versions = Channel.topic("versions")
+    def topic_versions = channel.topic("versions")
         .distinct()
         .branch { entry ->
             versions_file: entry instanceof Path
