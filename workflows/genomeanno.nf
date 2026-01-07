@@ -11,6 +11,7 @@ include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_geno
 include { GTDBTK_CLASSIFYWF } from '../modules/nf-core/gtdbtk/classifywf/main'
 include { ABRICATE_RUN } from '../modules/nf-core/abricate/run/main'
 include { ABRICATE_SUMMARY } from '../modules/nf-core/abricate/summary/main'
+include { CHECKM2_PREDICT } from '../modules/nf-core/checkm2/predict/main'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -30,7 +31,7 @@ workflow GENOMEANNO {
     //
     // MODULE: Abricate
     //
-    if(!params.skip_abricate) {
+    if(!params.arg_skip_abricate) {
     def abricate_db = params.abricate_db ? file(params.abricate_db, checkIfExists: true) : []
 
     ABRICATE_RUN (
@@ -63,6 +64,20 @@ workflow GENOMEANNO {
         )       
         ch_versions      = ch_versions.mix(GTDBTK_CLASSIFYWF.out.versions.first())
         ch_multiqc_files = ch_multiqc_files.mix(GTDBTK_CLASSIFYWF.out.summary.collect{v -> v[1]})
+    }
+
+    if (params.checkm2_db) {
+        ch_checkm2_db = [[:], file(params.checkm2_db, checkIfExists: true)]
+
+        CHECKM2_PREDICT(ch_samplesheet, ch_checkm2_db)
+        ch_versions = ch_versions.mix(CHECKM2_PREDICT.out.versions)
+
+        ch_checkm2_summaries = CHECKM2_PREDICT.out.checkm2_tsv
+            .map { _meta, summary -> [[id: 'checkm2'], summary] }
+            .groupTuple()
+        ch_multiqc_files = ch_multiqc_files.mix(
+            CHECKM2_PREDICT.out.checkm2_tsv.map { _meta, summary -> summary }.flatten()
+        )
     }
     
     //
