@@ -28,8 +28,9 @@ workflow GENOMEANNO {
     ch_multiqc_files = channel.empty()
 
     //
-    // MODULE: Abricate (AMR Screening)
+    // MODULE: Abricate
     //
+    if(!params.skip_abricate) {
     def abricate_db = params.abricate_db ? file(params.abricate_db, checkIfExists: true) : []
 
     ABRICATE_RUN (
@@ -38,7 +39,7 @@ workflow GENOMEANNO {
     )
     ch_versions      = ch_versions.mix(ABRICATE_RUN.out.versions.first())
     ch_multiqc_files = ch_multiqc_files.mix(ABRICATE_RUN.out.report.collect{v -> v[1]})
-
+    
     //
     // MODULE: Abricate Summary
     //
@@ -47,7 +48,7 @@ workflow GENOMEANNO {
         ABRICATE_RUN.out.report.collect{ v -> v[1] }.map{ reports -> [ [id:'summary'], reports ] }
     )
     ch_versions      = ch_versions.mix(ABRICATE_SUMMARY.out.versions)
-
+    }
     //
     // MODULE: GTDB-Tk (Taxonomic Classification)
     //
@@ -56,7 +57,7 @@ workflow GENOMEANNO {
         ch_gtdb_db = channel.fromPath(params.gtdb_db).map{ db -> [ [id:'gtdb'], db ] }.first()
 
         GTDBTK_CLASSIFYWF (
-            ch_samplesheet, // No need to map, strictly matches [meta, bins]
+            ch_samplesheet,
             ch_gtdb_db,
             false
         )       
