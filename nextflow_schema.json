@@ -43,6 +43,77 @@
                 }
             }
         },
+        "gtdbtk_options": {
+            "title": "GTDBtk options",
+            "type": "object",
+            "fa_icon": "fas fa-database",
+            "description": "Options for taxonomic classification with GTDBtk.",
+            "properties": {
+                "gtdb_db": {
+                    "type": "string",
+                    "format": "path",
+                    "description": "Path to the GTDB-Tk reference database.",
+                    "help_text": "Path to a local copy of the GTDB-Tk reference database. Required for running GTDBtk classification.",
+                    "fa_icon": "fas fa-database"
+                },
+                "gtdbtk_skip_aniscreen": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Skip the ANI screen step in GTDBtk classification.",
+                    "fa_icon": "fas fa-forward",
+                    "hidden": true
+                },
+                "fasta_extension": {
+                    "type": "string",
+                    "default": "fasta",
+                    "description": "File extension of input FASTA files.",
+                    "fa_icon": "fas fa-file-code",
+                    "help_text": "The file extension used for genome FASTA files (e.g. 'fasta', 'fa', 'fna')."
+                }
+            }
+        },
+        "abricate_options": {
+            "title": "Abricate options",
+            "type": "object",
+            "fa_icon": "fas fa-pills",
+            "description": "Options for antimicrobial resistance gene detection with Abricate.",
+            "properties": {
+                "arg_skip_abricate": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Skip the Abricate AMR screening step.",
+                    "fa_icon": "fas fa-forward"
+                },
+                "arg_abricate_db": {
+                    "type": "string",
+                    "description": "Path to a custom Abricate database directory.",
+                    "help_text": "Provide a path to a custom database to use with Abricate instead of the built-in databases.",
+                    "fa_icon": "fas fa-database"
+                },
+                "arg_abricate_db_ids": {
+                    "type": "string",
+                    "default": "ncbi",
+                    "description": "Abricate database ID(s) to use for AMR screening.",
+                    "help_text": "One or more Abricate database names to screen against, e.g. 'ncbi', 'card', 'resfinder'. Defaults to 'ncbi'.",
+                    "fa_icon": "fas fa-list"
+                }
+            }
+        },
+        "checkm2_options": {
+            "title": "CheckM2 options",
+            "type": "object",
+            "fa_icon": "fas fa-check-circle",
+            "description": "Options for genome quality assessment with CheckM2.",
+            "properties": {
+                "checkm2_db": {
+                    "type": "string",
+                    "format": "path",
+                    "description": "Path to the CheckM2 reference database.",
+                    "help_text": "Path to a local copy of the CheckM2 diamond database. If not provided, CheckM2 will attempt to download it automatically.",
+                    "fa_icon": "fas fa-database"
+                }
+            }
+        },
         "reference_genome_options": {
             "title": "Reference genome options",
             "type": "object",
@@ -221,7 +292,7 @@
                 },
                 "trace_report_suffix": {
                     "type": "string",
-                    "fa_icon": "far calendar",
+                    "fa_icon": "far fa-calendar",
                     "description": "Suffix to add to the trace report filename. Default is the date and time in the format yyyy-MM-dd_HH-mm-ss.",
                     "hidden": true
                 },
@@ -243,6 +314,15 @@
     "allOf": [
         {
             "$ref": "#/$defs/input_output_options"
+        },
+        {
+            "$ref": "#/$defs/gtdbtk_options"
+        },
+        {
+            "$ref": "#/$defs/abricate_options"
+        },
+        {
+            "$ref": "#/$defs/checkm2_options"
         },
         {
             "$ref": "#/$defs/reference_genome_options"
