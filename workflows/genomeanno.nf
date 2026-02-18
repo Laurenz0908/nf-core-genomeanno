@@ -31,24 +31,41 @@ workflow GENOMEANNO {
     //
     // MODULE: Abricate
     //
-    if(!params.arg_skip_abricate) {
-    def abricate_db = params.abricate_db ? file(params.abricate_db, checkIfExists: true) : []
+    if (!params.arg_skip_abricate) {
+    def abricate_dbs = params.arg_abricate_db_ids instanceof List
+        ? params.arg_abricate_db_ids
+        : [params.arg_abricate_db_ids]
 
-    ABRICATE_RUN (
-        ch_samplesheet,
-        abricate_db
+    // Create a channel of [db_name] values
+    ch_abricate_dbs = Channel.fromList(abricate_dbs)
+
+    // Combine every sample with every DB → [meta + db_id, assembly, db]
+    ch_abricate_input = ch_samplesheet
+        .combine(ch_abricate_dbs)
+        .map { meta, assembly, db ->
+            def new_meta = meta + [db: db]
+            [ new_meta, assembly ]
+        }
+
+    // Use the custom databasedir if provided
+    def abricate_db_dir = params.arg_abricate_db ? file(params.arg_abricate_db) : []
+
+    ABRICATE_RUN(
+        ch_abricate_input,
+        abricate_db_dir
     )
-    ch_versions      = ch_versions.mix(ABRICATE_RUN.out.versions.first())
-    ch_multiqc_files = ch_multiqc_files.mix(ABRICATE_RUN.out.report.collect{v -> v[1]})
-    
-    //
-    // MODULE: Abricate Summary
-    //
-    // Collect all reports and create a single summary
-    ABRICATE_SUMMARY (
-        ABRICATE_RUN.out.report.collect{ v -> v[1] }.map{ reports -> [ [id:'summary'], reports ] }
-    )
-    ch_versions      = ch_versions.mix(ABRICATE_SUMMARY.out.versions)
+    ch_versions = ch_versions.mix(ABRICATE_RUN.out.versions.first())
+
+    // Group by DB for per-DB summary
+    ABRICATE_RUN.out.report
+        .map { meta, report -> [ meta.db, meta, report ] }
+        .groupTuple(by: 0)
+        .map { db, metas, reports ->
+            [ [ id: "summary_${db}", db: db ], reports ]
+        }
+        | ABRICATE_SUMMARY
+
+    ch_versions = ch_versions.mix(ABRICATE_SUMMARY.out.versions.first())
     }
     //
     // MODULE: GTDB-Tk (Taxonomic Classification)
