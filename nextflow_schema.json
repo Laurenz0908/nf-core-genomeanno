@@ -91,10 +91,11 @@
                     "fa_icon": "fas fa-database"
                 },
                 "arg_abricate_db_ids": {
-                    "type": "string",
-                    "default": "ncbi",
-                    "description": "Abricate database ID(s) to use for AMR screening.",
-                    "help_text": "One or more Abricate database names to screen against, e.g. 'ncbi', 'card', 'resfinder'. Defaults to 'ncbi'.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of Abricate database IDs to use for AMR screening (e.g. 'ncbi', 'card', 'resfinder').",
                     "fa_icon": "fas fa-list"
                 }
             }
