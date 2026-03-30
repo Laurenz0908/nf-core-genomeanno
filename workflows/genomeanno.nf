@@ -93,7 +93,19 @@ workflow GENOMEANNO {
     // Requires: GTDB-Tk with ANI screen enabled (default)
     //
     if (params.gtdb_db && !params.skip_primer_design && !params.gtdbtk_skip_aniscreen) {
-
+        
+        if (params.primer_gtdbtk_outdir) {
+            ch_gtdbtk_for_primers = ch_samplesheet
+                .map { meta, _assembly ->
+                    def sample_dir = file("${params.primer_gtdbtk_outdir}/${meta.id}")
+                    def gtdbtk_dir = sample_dir.exists() ? sample_dir : file(params.primer_gtdbtk_outdir)
+                    [ meta, gtdbtk_dir ]
+                }
+        } else if (!params.gtdbtk_skip_aniscreen) {
+            ch_gtdbtk_for_primers = GTDBTK_CLASSIFYWF.out.gtdb_outdir
+        } else {
+            ch_gtdbtk_for_primers = Channel.empty()
+        }
         //
         // Step 1: Extract closest reference genomes from GTDB-Tk ANI output
         //
