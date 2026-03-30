@@ -12,6 +12,11 @@ include { GTDBTK_CLASSIFYWF } from '../modules/nf-core/gtdbtk/classifywf/main'
 include { ABRICATE_RUN } from '../modules/nf-core/abricate/run/main'
 include { ABRICATE_SUMMARY } from '../modules/nf-core/abricate/summary/main'
 include { CHECKM2_PREDICT } from '../modules/nf-core/checkm2/predict/main'
+include { NUCMER                 } from '../modules/nf-core/nucmer/main'
+include { EXTRACT_CLOSE_REFS     } from '../modules/local/extract_close_refs'
+include { COORDS_TO_BED          } from '../modules/local/coords_to_bed'
+include { DESIGN_STRAIN_PRIMERS  } from '../modules/local/design_strain_primers'
+include { BLAST_VALIDATE_PRIMERS } from '../modules/local/blast_validate_primers'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -82,6 +87,93 @@ workflow GENOMEANNO {
         ch_versions      = ch_versions.mix(GTDBTK_CLASSIFYWF.out.versions.first())
         ch_multiqc_files = ch_multiqc_files.mix(GTDBTK_CLASSIFYWF.out.summary.collect{v -> v[1]})
     }
+
+    //
+    // STRAIN-SPECIFIC PRIMER DESIGN
+    // Requires: GTDB-Tk with ANI screen enabled (default)
+    //
+    if (params.gtdb_db && !params.skip_primer_design && !params.gtdbtk_skip_aniscreen) {
+
+        //
+        // Step 1: Extract closest reference genomes from GTDB-Tk ANI output
+        //
+        EXTRACT_CLOSE_REFS(
+            GTDBTK_CLASSIFYWF.out.gtdb_outdir,       // [meta, gtdbtk_output_dir/]
+            file(params.gtdb_db, checkIfExists: true)
+        )
+        ch_versions = ch_versions.mix(EXTRACT_CLOSE_REFS.out.versions.first())
+
+        //
+        // Step 2: Align each reference genome against the target assembly (nucmer)
+        //
+        ch_nucmer_input = ch_samplesheet
+            .join(EXTRACT_CLOSE_REFS.out.refs)        // [meta, assembly, [ref1.fna, ref2.fna, ...]]
+            .flatMap { meta, assembly, refs ->
+                def asm = assembly instanceof List ? assembly[0] : assembly
+                refs.collect { ref ->
+                    def nucmer_meta = meta + [ref_name: ref.baseName]
+                    [ nucmer_meta, asm, ref ]
+                }
+            }
+
+        NUCMER(ch_nucmer_input)
+        ch_versions = ch_versions.mix(NUCMER.out.versions.first())
+
+        //
+        // Step 3: Convert coords to BED, then collect all BEDs per sample
+        //
+        COORDS_TO_BED(NUCMER.out.coords)
+        ch_versions = ch_versions.mix(COORDS_TO_BED.out.versions.first())
+
+        // Group BED files back by original sample ID (strip ref_name from meta)
+        ch_beds_per_sample = COORDS_TO_BED.out.bed
+            .map { meta, bed ->
+                def sample_meta = meta.subMap('id') + meta.findAll { k, _v -> k != 'ref_name' }
+                // Use just the sample id for grouping
+                [ meta.id, meta, bed ]
+            }
+            .groupTuple(by: 0)
+            .map { sample_id, metas, beds ->
+                // Recover the original meta (without ref_name)
+                def original_meta = metas[0].findAll { k, _v -> k != 'ref_name' }
+                [ original_meta, beds ]
+            }
+
+        //
+        // Step 4: Find unique regions and design primers
+        //
+        ch_primer_input = ch_samplesheet
+            .map { meta, assembly ->
+                def asm = assembly instanceof List ? assembly[0] : assembly
+                [ meta.id, meta, asm ]
+            }
+            .join(
+                ch_beds_per_sample.map { meta, beds -> [ meta.id, beds ] },
+                by: 0
+            )
+            .map { sample_id, meta, assembly, beds ->
+                [ meta, assembly, beds ]
+            }
+
+        DESIGN_STRAIN_PRIMERS(ch_primer_input)
+        ch_versions = ch_versions.mix(DESIGN_STRAIN_PRIMERS.out.versions.first())
+
+        //
+        // Step 5 (optional): BLAST validation
+        //
+        if (params.primer_blast_db) {
+            ch_blast_input = DESIGN_STRAIN_PRIMERS.out.primers_fasta
+                .join(DESIGN_STRAIN_PRIMERS.out.primers_tsv)
+                .map { meta, fasta, tsv -> [ meta, fasta, tsv ] }
+
+            BLAST_VALIDATE_PRIMERS(
+                ch_blast_input,
+                file(params.primer_blast_db, checkIfExists: true)
+            )
+            ch_versions = ch_versions.mix(BLAST_VALIDATE_PRIMERS.out.versions.first())
+        }
+    }
+
 
     if (params.checkm2_db) {
         ch_checkm2_db = [[:], file(params.checkm2_db, checkIfExists: true)]
